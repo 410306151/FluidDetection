@@ -58,6 +58,9 @@ class GeneralizedRCNN(nn.Module):
         self.backbone = backbone
         self.proposal_generator = proposal_generator
         self.roi_heads = roi_heads
+        
+        print("detectron2.modeling.meta_arch.rcnn.GeneralizedRCNN.init", file=open("testDet2.txt", "a"))
+
         self.input_format = input_format
         self.vis_period = vis_period
         if vis_period > 0:
@@ -145,6 +148,9 @@ class GeneralizedRCNN(nn.Module):
                 "pred_boxes", "pred_classes", "scores", "pred_masks", "pred_keypoints"
         """
         
+        print("detectron2.modeling.meta_arch.rcnn.GeneralizedRCNN.forward", file=open("testDet2.txt", "a"))
+        print("--training: " + str(self.training), file=open("testDet2.txt", "a"))
+        print("--batched_inputs: " + str(batched_inputs), file=open("testDet2.txt", "a"))
         if not self.training:
             return self.inference(batched_inputs)
 
@@ -198,9 +204,15 @@ class GeneralizedRCNN(nn.Module):
             Otherwise, a list[Instances] containing raw network outputs.
         """
         assert not self.training
+        print("detectron2.modeling.meta_arch.rcnn.GeneralizedRCNN.inference", file=open("testDet2.txt", "a"))
 
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
+        print("--images: " + str(images), file=open("testDet2.txt", "a"))
+        print("--features: " + str(features), file=open("testDet2.txt", "a"))
+        print("--detected_instances: " + str(detected_instances), file=open("testDet2.txt", "a"))
+        print("--proposal_generator: " + str(self.proposal_generator is not None), file=open("testDet2.txt", "a"))
+        print("--do_postprocess: " + str(do_postprocess), file=open("testDet2.txt", "a"))
 
         if detected_instances is None:
             if self.proposal_generator is not None:
@@ -209,6 +221,7 @@ class GeneralizedRCNN(nn.Module):
                 assert "proposals" in batched_inputs[0]
                 proposals = [x["proposals"].to(self.device) for x in batched_inputs]
 
+            print("--proposals: " + str(proposals), file=open("testDet2.txt", "a"))
             results, _ = self.roi_heads(images, features, proposals, None)
         else:
             detected_instances = [x.to(self.device) for x in detected_instances]
@@ -235,16 +248,28 @@ class GeneralizedRCNN(nn.Module):
         Rescale the output instances to the target size.
         """
         # note: private function; subject to changes
+        print("detectron2.modeling.meta_arch.rcnn.GeneralizedRCNN._postprocess", file=open("testDet2.txt", "a"))
+        print("--instances: " + str(instances), file=open("testDet2.txt", "a"))
+        print("--batched_inputs: " + str(batched_inputs), file=open("testDet2.txt", "a"))
         processed_results = []
         for results_per_image, input_per_image, image_size in zip(
             instances, batched_inputs, image_sizes
         ):
             height = input_per_image.get("height", image_size[0])
             width = input_per_image.get("width", image_size[1])
-            THISISTEST = Instances((height, width), **results_per_image.get_fields())
+            print("--results_per_image: " + str(results_per_image), file=open("testDet2.txt", "a"))
+            print("--height: " + str(height), file=open("testDet2.txt", "a"))
+            print("--width: " + str(width), file=open("testDet2.txt", "a"))
             r = detector_postprocess(results_per_image, height, width)
+            print("--r (after detector_postprocess): " + str(r), file=open("testDet2.txt", "a"))
+            print("--r (shape) (after detector_postprocess): ", file=open("testDet2.txt", "a"))
+            print(len(r.pred_masks), file=open("testDet2.txt", "a"))
+            print(len(r.pred_masks[0]), file=open("testDet2.txt", "a"))
+            print(len(r.pred_masks[0][0]), file=open("testDet2.txt", "a"))
+            print(r.pred_masks[0][0], file=open("testDet2.txt", "a"))
             processed_results.append({"instances": r})
             
+        print("--processed_results: " + str(processed_results), file=open("testDet2.txt", "a"))
         return processed_results
 
 

@@ -11,6 +11,7 @@ from detectron2.layers import Linear, ShapeSpec, batched_nms, cat, cross_entropy
 from detectron2.modeling.box_regression import Box2BoxTransform
 from detectron2.structures import Boxes, Instances
 from detectron2.utils.events import get_event_storage
+from detectron2.modeling.postprocessing import detector_postprocess
 
 __all__ = ["fast_rcnn_inference", "FastRCNNOutputLayers"]
 
@@ -82,6 +83,10 @@ def fast_rcnn_inference(
         )
         for scores_per_image, boxes_per_image, image_shape in zip(scores, boxes, image_shapes)
     ]
+    print("detectron2.modeling.roi_head.fast_rcnn.fast_rcnn_inference", file=open("testDet2.txt", "a"))
+    print("--result_per_image: ", file=open("testDet2.txt", "a"))
+    print(type(result_per_image[0][0]), file=open("testDet2.txt", "a"))
+    print(result_per_image[0][0], file=open("testDet2.txt", "a"))
     return [x[0] for x in result_per_image], [x[1] for x in result_per_image]
 
 
@@ -134,7 +139,11 @@ def fast_rcnn_inference_single_image(
     Returns:
         Same as `fast_rcnn_inference`, but for only one image.
     """
+    print("detectron2.modeling.roi_head.fast_rcnn.fast_rcnn_inference_single_image", file=open("testDet2.txt", "a"))
+    print("--boxes (type): " + str(type(boxes)), file=open("testDet2.txt", "a"))
     valid_mask = torch.isfinite(boxes).all(dim=1) & torch.isfinite(scores).all(dim=1)
+    print("--valid_mask: ", file=open("testDet2.txt", "a"))
+    print(valid_mask, file=open("testDet2.txt", "a"))
     if not valid_mask.all():
         boxes = boxes[valid_mask]
         scores = scores[valid_mask]
@@ -149,20 +158,46 @@ def fast_rcnn_inference_single_image(
     # 1. Filter results based on detection scores. It can make NMS more efficient
     #    by filtering out low-confidence detections.
     filter_mask = scores > score_thresh  # R x K
+    print("--scores (before num_bbox_reg_classes): ", file=open("testDet2.txt", "a"))
+    print(scores, file=open("testDet2.txt", "a"))
+    print("--boxes (before num_bbox_reg_classes): ", file=open("testDet2.txt", "a"))
+    print(boxes, file=open("testDet2.txt", "a"))
+    print("--filter_mask: ", file=open("testDet2.txt", "a"))
+    print(filter_mask, file=open("testDet2.txt", "a"))
     # R' x 2. First column contains indices of the R predictions;
     # Second column contains indices of classes.
     filter_inds = filter_mask.nonzero()
+    print("--filter_inds: ", file=open("testDet2.txt", "a"))
+    print(filter_inds, file=open("testDet2.txt", "a"))
+    print("--num_bbox_reg_classes: ", file=open("testDet2.txt", "a"))
+    print(num_bbox_reg_classes, file=open("testDet2.txt", "a"))
     if num_bbox_reg_classes == 1:
         boxes = boxes[filter_inds[:, 0], 0]
     else:
         boxes = boxes[filter_mask]
     scores = scores[filter_mask]
+    print("--scores (after num_bbox_reg_classes): ", file=open("testDet2.txt", "a"))
+    print(scores, file=open("testDet2.txt", "a"))
+    print("--boxes (after num_bbox_reg_classes): ", file=open("testDet2.txt", "a"))
+    print(boxes, file=open("testDet2.txt", "a"))
+    #scores[0] = 0.9999
+    #scores[1] = 0.9999
 
     # 2. Apply NMS for each class independently.
     keep = batched_nms(boxes, scores, filter_inds[:, 1], nms_thresh)
+    print("--keep (before topk): ", file=open("testDet2.txt", "a"))
+    print(keep, file=open("testDet2.txt", "a"))
     if topk_per_image >= 0:
         keep = keep[:topk_per_image]
     boxes, scores, filter_inds = boxes[keep], scores[keep], filter_inds[keep]
+    print("--topk_per_image: ", file=open("testDet2.txt", "a"))
+    print(topk_per_image, file=open("testDet2.txt", "a"))
+    print("--keep: ", file=open("testDet2.txt", "a"))
+    print(keep, file=open("testDet2.txt", "a"))
+    print("--boxes (after keep): ", file=open("testDet2.txt", "a"))
+    print(boxes, file=open("testDet2.txt", "a"))
+    print("--scores (after keep): ", file=open("testDet2.txt", "a"))
+    print(scores, file=open("testDet2.txt", "a"))
 
     result = Instances(image_shape)
     result.pred_boxes = Boxes(boxes)
@@ -486,7 +521,7 @@ class FastRCNNOutputLayers(nn.Module):
         }
         return {k: v * self.loss_weight.get(k, 1.0) for k, v in losses.items()}
 
-    def inference(self, predictions: Tuple[torch.Tensor, torch.Tensor], proposals: List[Instances]):
+    def inference(self, predictions: Tuple[torch.Tensor, torch.Tensor], proposals: List[Instances], last_prediction):
         """
         Args:
             predictions: return values of :meth:`forward()`.
@@ -497,9 +532,26 @@ class FastRCNNOutputLayers(nn.Module):
             list[Instances]: same as `fast_rcnn_inference`.
             list[Tensor]: same as `fast_rcnn_inference`.
         """
+        
         boxes = self.predict_boxes(predictions, proposals)
         scores = self.predict_probs(predictions, proposals)
         image_shapes = [x.image_size for x in proposals]
+        print("detectron2.modeling.roi_heads.fast_rcnn.inference", file=open("testDet2.txt", "a"))
+        print("--image_shapes: " + str(image_shapes), file=open("testDet2.txt", "a"))
+        print("--predictions: " + str(predictions), file=open("testDet2.txt", "a"))
+        print("--proposals: " + str(proposals), file=open("testDet2.txt", "a"))
+        print("--last_prediction: " + str(last_prediction), file=open("testDet2.txt", "a"))
+        if len(last_prediction) > 0:
+            test_r = detector_postprocess(last_prediction, 480, 640)
+            print("--test_r: " + str(test_r), file=open("testDet2.txt", "a"))
+            temppp = my_build_prediction(
+                boxes,
+                scores,
+                image_shapes,
+                self.test_score_thresh,
+            )
+            print("--temppp: " + str(temppp), file=open("testDet2.txt", "a"))
+        
         return fast_rcnn_inference(
             boxes,
             scores,
@@ -590,3 +642,42 @@ class FastRCNNOutputLayers(nn.Module):
         num_inst_per_image = [len(p) for p in proposals]
         probs = F.softmax(scores, dim=-1)
         return probs.split(num_inst_per_image, dim=0)
+
+def my_build_prediction(
+    boxes: List[torch.Tensor],
+    scores: List[torch.Tensor],
+    image_shapes: List[Tuple[int, int]],
+    score_thresh: float,
+):
+    for scores_per_image, boxes_per_image, image_shape in zip(scores, boxes, image_shapes):
+        valid_mask = torch.isfinite(boxes_per_image).all(dim=1) & torch.isfinite(scores_per_image).all(dim=1)
+        print("--valid_mask.all(): " + str(valid_mask.all()), file=open("testDet2.txt", "a"))
+        if not valid_mask.all():
+            boxes = boxes_per_image[valid_mask]
+            scores = scores_per_image[valid_mask]
+        scores = scores_per_image[:, :-1]
+        num_bbox_reg_classes = boxes_per_image.shape[1] // 4
+        # Convert to Boxes to use the `clip` function ...
+        boxes = Boxes(boxes_per_image.reshape(-1, 4))
+        boxes.clip(image_shape)
+        boxes = boxes.tensor.view(-1, num_bbox_reg_classes, 4)  # R x C x 4
+        # 過濾 confidence score ，大於門檻的為 true 其餘 false
+        filter_mask = scores > score_thresh  # R x K
+        # 只保留為 true 的那些元素，並記錄是第幾個元素(才知道要保留哪個 bbox)
+        filter_inds = filter_mask.nonzero()
+        # box 根據要分辨的物件數量做不同的處裡
+        if num_bbox_reg_classes == 1:
+            boxes = boxes[filter_inds[:, 0], 0]
+        else:
+            boxes = boxes[filter_mask]
+        scores = scores[filter_mask]
+        
+        # 建立一個新的 Instances ，方便製作 binary mask map
+        result = Instances(image_shape)
+        result.pred_boxes = Boxes(boxes)
+        result.scores = scores
+        result.pred_classes = filter_inds[:, 1]
+        
+    print("--result (in my_build_prediction): " + str(result), file=open("testDet2.txt", "a"))
+        
+    #return result

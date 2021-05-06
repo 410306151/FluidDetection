@@ -221,6 +221,8 @@ class DefaultPredictor:
             image = torch.as_tensor(image.astype("float32").transpose(2, 0, 1))
 
             inputs = {"image": image, "height": height, "width": width}
+            print("detectron2.engine.DefaultPredictor", file=open("testDet2.txt", "a"))
+            print("--self.model([inputs])[0]" + str(inputs), file=open("testDet2.txt", "a"))
             predictions = self.model([inputs])[0]
             return predictions
 

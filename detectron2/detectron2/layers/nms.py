@@ -13,6 +13,12 @@ def batched_nms(
     """
     Same as torchvision.ops.boxes.batched_nms, but safer.
     """
+    print("detectron2.layers.nms.batched_nms", file=open("testDet2.txt", "a"))
+    print("--scores: ", file=open("testDet2.txt", "a"))
+    print(max(scores), file=open("testDet2.txt", "a"))
+    print("--len(boxes): " + str(len(boxes)), file=open("testDet2.txt", "a"))
+    print("--boxes: ", file=open("testDet2.txt", "a"))
+    print(boxes, file=open("testDet2.txt", "a"))
     assert boxes.shape[-1] == 4
     # TODO may need better strategy.
     # Investigate after having a fully-cuda NMS op.

@@ -45,6 +45,8 @@ def detector_postprocess(
         output_width_tmp / results.image_size[1],
         output_height_tmp / results.image_size[0],
     )
+    print("detectron2.modeling.postprocessing.detector_postprocess", file=open("testDet2.txt", "a"))
+    print("--results has pred_masks: " + str(results.has("pred_masks")), file=open("testDet2.txt", "a"))
     results = Instances(new_size, **results.get_fields())
 
     if results.has("pred_boxes"):
@@ -59,6 +61,9 @@ def detector_postprocess(
     output_boxes.clip(results.image_size)
 
     results = results[output_boxes.nonempty()]
+    
+    print("--mask_threshold: " + str(mask_threshold), file=open("testDet2.txt", "a"))
+    print("--results.pred_masks before retry: " + str(results.pred_masks), file=open("testDet2.txt", "a"))
 
     if results.has("pred_masks"):
         results.pred_masks = retry_if_cuda_oom(paste_masks_in_image)(
@@ -67,6 +72,8 @@ def detector_postprocess(
             results.image_size,
             threshold=mask_threshold,
         )
+    
+    print("--results.pred_masks after retry: " + str(results.pred_masks), file=open("testDet2.txt", "a"))
 
     if results.has("pred_keypoints"):
         results.pred_keypoints[:, :, 0] *= scale_x
