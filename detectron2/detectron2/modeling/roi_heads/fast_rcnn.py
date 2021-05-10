@@ -521,7 +521,7 @@ class FastRCNNOutputLayers(nn.Module):
         }
         return {k: v * self.loss_weight.get(k, 1.0) for k, v in losses.items()}
 
-    def inference(self, predictions: Tuple[torch.Tensor, torch.Tensor], proposals: List[Instances], last_prediction):
+    def inference(self, predictions: Tuple[torch.Tensor, torch.Tensor], proposals: List[Instances], last_prediction, features_for_pred_masks, get_pred_masks):
         """
         Args:
             predictions: return values of :meth:`forward()`.
@@ -541,16 +541,23 @@ class FastRCNNOutputLayers(nn.Module):
         print("--predictions: " + str(predictions), file=open("testDet2.txt", "a"))
         print("--proposals: " + str(proposals), file=open("testDet2.txt", "a"))
         print("--last_prediction: " + str(last_prediction), file=open("testDet2.txt", "a"))
+        print("--features_for_pred_masks: " + str(features_for_pred_masks), file=open("testDet2.txt", "a"))
+        
         if len(last_prediction) > 0:
             test_r = detector_postprocess(last_prediction, 480, 640)
             print("--test_r: " + str(test_r), file=open("testDet2.txt", "a"))
-            temppp = my_build_prediction(
+            temppp = [my_build_prediction(
                 boxes,
                 scores,
                 image_shapes,
                 self.test_score_thresh,
-            )
+            )]
             print("--temppp: " + str(temppp), file=open("testDet2.txt", "a"))
+            temppp = get_pred_masks(features_for_pred_masks, temppp)
+            print("--temppp (after get_pred_masks): " + str(temppp), file=open("testDet2.txt", "a"))
+            temppp = detector_postprocess(temppp[0], 480, 640)
+            print("--temppp (after detector_postprocess): " + str(temppp), file=open("testDet2.txt", "a"))
+            test_scores = adjust_scores(test_r, temppp, scores)
         
         return fast_rcnn_inference(
             boxes,
@@ -651,7 +658,6 @@ def my_build_prediction(
 ):
     for scores_per_image, boxes_per_image, image_shape in zip(scores, boxes, image_shapes):
         valid_mask = torch.isfinite(boxes_per_image).all(dim=1) & torch.isfinite(scores_per_image).all(dim=1)
-        print("--valid_mask.all(): " + str(valid_mask.all()), file=open("testDet2.txt", "a"))
         if not valid_mask.all():
             boxes = boxes_per_image[valid_mask]
             scores = scores_per_image[valid_mask]
@@ -678,6 +684,27 @@ def my_build_prediction(
         result.scores = scores
         result.pred_classes = filter_inds[:, 1]
         
-    print("--result (in my_build_prediction): " + str(result), file=open("testDet2.txt", "a"))
-        
-    #return result
+    return result
+    
+def adjust_scores(last_prediction, now_prediction, scores):
+    print("detectron2.modeling.roi_heads.fast_rcnn.adjust_scores", file=open("testDet2.txt", "a"))
+    # 取得Instance class裡fields的資料，再取出fields裡pred_masks的資料
+    last_pred_masks = last_prediction.get_fields()
+    now_pred_masks = now_prediction.get_fields()
+    print("--now: " + str(now_pred_masks['pred_classes'][29]), file=open("mask_output.txt", "w"))
+    last_pred_masks = last_pred_masks['pred_masks']
+    now_pred_masks = now_pred_masks['pred_masks']
+    # test
+    #test = torch.logical_and(last_pred_masks[0], now_pred_masks[9])
+    #test2 = torch.logical_and(last_pred_masks[0], now_pred_masks[1])
+    torch.set_printoptions(profile="full")
+    print("--last_pred_masks[0].nonzero: " + str(torch.nonzero(last_pred_masks[0])), file=open("mask_output.txt", "a"))
+    print("--now_pred_masks[0].nonzero: " + str(torch.nonzero(now_pred_masks[29])), file=open("mask_output.txt", "a"))
+    #print("--test: " + str(test), file=open("mask_output.txt", "a"))
+    torch.set_printoptions(profile="default") # reset
+    #print("--test torch.count_nonzero: " + str(torch.count_nonzero(test)), file=open("testDet2.txt", "a"))
+    #print("--test2 torch.count_nonzero: " + str(torch.count_nonzero(test2)), file=open("testDet2.txt", "a"))
+    
+    
+    
+    return 0

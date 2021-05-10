@@ -739,12 +739,14 @@ class StandardROIHeads(ROIHeads):
             return proposals, losses
         else:
             print("detectron2.modeling.roi_heads.roi_heads.forward", file=open("testDet2.txt", "a"))
-            pred_instances = self._forward_box(features, proposals, self.last_prediction)
+            pred_instances = self._forward_box(features, proposals, self.last_prediction, features, self.forward_with_given_boxes)
             print("--pred_instances (first): " + str(pred_instances), file=open("testDet2.txt", "a"))
             # During inference cascaded prediction is used: the mask and keypoints heads are only
             # applied to the top scoring box detections.
             pred_instances = self.forward_with_given_boxes(features, pred_instances)
             self.last_prediction = pred_instances[0]
+            
+            print("--self._forward_mask: " + str(type(self._forward_mask)), file=open("testDet2.txt", "a"))
             
             print("--pred_instances (second): " + str(pred_instances), file=open("testDet2.txt", "a"))
             print("--pred_instances (shape): ", file=open("testDet2.txt", "a"))
@@ -777,12 +779,14 @@ class StandardROIHeads(ROIHeads):
         """
         assert not self.training
         assert instances[0].has("pred_boxes") and instances[0].has("pred_classes")
+        print("detectron2.modeling.roi_heads.roi_heads.forward_with_given_boxes", file=open("testDet2.txt", "a"))
+        print("--features: " + str(features), file=open("testDet2.txt", "a"))
 
         instances = self._forward_mask(features, instances)
         instances = self._forward_keypoint(features, instances)
         return instances
 
-    def _forward_box(self, features: Dict[str, torch.Tensor], proposals: List[Instances], last_prediction):
+    def _forward_box(self, features: Dict[str, torch.Tensor], proposals: List[Instances], last_prediction, features_for_pred_masks, get_pred_masks):
         """
         Forward logic of the box prediction branch. If `self.train_on_pred_boxes is True`,
             the function puts predicted boxes in the `proposal_boxes` field of `proposals` argument.
@@ -820,7 +824,7 @@ class StandardROIHeads(ROIHeads):
             print("detectron2.modeling.roi_heads.roi_heads._forward_box", file=open("testDet2.txt", "a"))
             print("--predictions: " + str(predictions), file=open("testDet2.txt", "a"))
             print("--proposals: " + str(proposals), file=open("testDet2.txt", "a"))
-            pred_instances, _ = self.box_predictor.inference(predictions, proposals, last_prediction)
+            pred_instances, _ = self.box_predictor.inference(predictions, proposals, last_prediction, features_for_pred_masks, get_pred_masks)
             return pred_instances
 
     def _forward_mask(self, features: Dict[str, torch.Tensor], instances: List[Instances]):
@@ -851,6 +855,8 @@ class StandardROIHeads(ROIHeads):
 
         print("detectron2.modeling.roi_heads.roi_heads._forward_mask", file=open("testDet2.txt", "a"))
         print("--self.mask_pooler: " + str(self.mask_pooler is not None), file=open("testDet2.txt", "a"))
+        print("--features: " + str(features), file=open("testDet2.txt", "a"))
+        print("--instances: " + str(instances), file=open("testDet2.txt", "a"))
         if self.mask_pooler is not None:
             features = [features[f] for f in self.mask_in_features]
             boxes = [x.proposal_boxes if self.training else x.pred_boxes for x in instances]
