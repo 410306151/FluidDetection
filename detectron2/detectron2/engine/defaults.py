@@ -222,8 +222,9 @@ class DefaultPredictor:
 
             inputs = {"image": image, "height": height, "width": width}
             print("detectron2.engine.DefaultPredictor", file=open("testDet2.txt", "a"))
-            print("--self.model([inputs])[0]" + str(inputs), file=open("testDet2.txt", "a"))
+            print("--self.model([inputs])[0]: " + str(inputs), file=open("testDet2.txt", "a"))
             predictions = self.model([inputs])[0]
+            print("--predictions in defaultpredictor: " + str(predictions), file=open("testDet2.txt", "a"))
             return predictions
 
 

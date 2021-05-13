@@ -544,20 +544,20 @@ class FastRCNNOutputLayers(nn.Module):
         print("--features_for_pred_masks: " + str(features_for_pred_masks), file=open("testDet2.txt", "a"))
         
         if len(last_prediction) > 0:
-            test_r = detector_postprocess(last_prediction, 480, 640)
-            print("--test_r: " + str(test_r), file=open("testDet2.txt", "a"))
-            temppp = [my_build_prediction(
+            last_pred = detector_postprocess(last_prediction, 480, 640)
+            print("--last_prediction: " + str(last_prediction), file=open("testDet2.txt", "a"))
+            cur_pred = [my_build_prediction(
                 boxes,
                 scores,
                 image_shapes,
                 self.test_score_thresh,
             )]
-            print("--temppp: " + str(temppp), file=open("testDet2.txt", "a"))
-            temppp = get_pred_masks(features_for_pred_masks, temppp)
-            print("--temppp (after get_pred_masks): " + str(temppp), file=open("testDet2.txt", "a"))
-            temppp = detector_postprocess(temppp[0], 480, 640)
-            print("--temppp (after detector_postprocess): " + str(temppp), file=open("testDet2.txt", "a"))
-            test_scores = adjust_scores(test_r, temppp, scores)
+            print("--cur_pred: " + str(cur_pred), file=open("testDet2.txt", "a"))
+            cur_pred = get_pred_masks(features_for_pred_masks, cur_pred)
+            print("--cur_pred (after get_pred_masks): " + str(cur_pred), file=open("testDet2.txt", "a"))
+            cur_pred = detector_postprocess(cur_pred[0], 480, 640)
+            print("--cur_pred (after detector_postprocess): " + str(cur_pred), file=open("testDet2.txt", "a"))
+            test_scores = adjust_scores(last_pred, cur_pred, scores)
         
         return fast_rcnn_inference(
             boxes,
@@ -686,22 +686,25 @@ def my_build_prediction(
         
     return result
     
-def adjust_scores(last_prediction, now_prediction, scores):
+def adjust_scores(last_prediction, cur_prediction, scores):
     print("detectron2.modeling.roi_heads.fast_rcnn.adjust_scores", file=open("testDet2.txt", "a"))
     # 取得Instance class裡fields的資料，再取出fields裡pred_masks的資料
     last_pred_masks = last_prediction.get_fields()
-    now_pred_masks = now_prediction.get_fields()
-    print("--now: " + str(now_pred_masks['pred_classes'][29]), file=open("mask_output.txt", "w"))
+    cur_pred_masks = cur_prediction.get_fields()
+    print("--last (class): " + str(last_pred_masks['pred_classes'][0]), file=open("mask_output.txt", "w"))
+    print("--cur (class): " + str(cur_pred_masks['pred_classes'][2]), file=open("mask_output.txt", "a"))
+    print("--last (bbox): " + str(last_pred_masks['pred_boxes'][0]), file=open("mask_output.txt", "a"))
+    print("--cur (bbox): " + str(cur_pred_masks['pred_boxes'][2]), file=open("mask_output.txt", "a"))
     last_pred_masks = last_pred_masks['pred_masks']
-    now_pred_masks = now_pred_masks['pred_masks']
+    cur_pred_masks = cur_pred_masks['pred_masks']
     # test
     #test = torch.logical_and(last_pred_masks[0], now_pred_masks[9])
     #test2 = torch.logical_and(last_pred_masks[0], now_pred_masks[1])
-    torch.set_printoptions(profile="full")
-    print("--last_pred_masks[0].nonzero: " + str(torch.nonzero(last_pred_masks[0])), file=open("mask_output.txt", "a"))
-    print("--now_pred_masks[0].nonzero: " + str(torch.nonzero(now_pred_masks[29])), file=open("mask_output.txt", "a"))
+    #torch.set_printoptions(profile="full")
+    print("--last_pred_masks.nonzero: " + str(torch.nonzero(last_pred_masks[0])), file=open("mask_output.txt", "a"))
+    print("--cur_pred_masks.nonzero: " + str(torch.nonzero(cur_pred_masks[2])), file=open("mask_output.txt", "a"))
     #print("--test: " + str(test), file=open("mask_output.txt", "a"))
-    torch.set_printoptions(profile="default") # reset
+    #torch.set_printoptions(profile="default") # reset
     #print("--test torch.count_nonzero: " + str(torch.count_nonzero(test)), file=open("testDet2.txt", "a"))
     #print("--test2 torch.count_nonzero: " + str(torch.count_nonzero(test2)), file=open("testDet2.txt", "a"))
     

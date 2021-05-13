@@ -58,6 +58,7 @@ class GeneralizedRCNN(nn.Module):
         self.backbone = backbone
         self.proposal_generator = proposal_generator
         self.roi_heads = roi_heads
+        self.test = []
         
         print("detectron2.modeling.meta_arch.rcnn.GeneralizedRCNN.init", file=open("testDet2.txt", "a"))
 
@@ -222,14 +223,18 @@ class GeneralizedRCNN(nn.Module):
                 proposals = [x["proposals"].to(self.device) for x in batched_inputs]
 
             print("--proposals: " + str(proposals), file=open("testDet2.txt", "a"))
-            results, _ = self.roi_heads(images, features, proposals, None)
+            results, _ = self.roi_heads(images, features, proposals, self.test, None)
         else:
             detected_instances = [x.to(self.device) for x in detected_instances]
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
 
         if do_postprocess:
             assert not torch.jit.is_scripting(), "Scripting is not supported for postprocess."
-            return GeneralizedRCNN._postprocess(results, batched_inputs, images.image_sizes)
+            test = GeneralizedRCNN._postprocess(results, batched_inputs, images.image_sizes)
+            self.test = test[0]['instances']
+            print("--test (type): " + str(type(test[0]['instances'])), file=open("testDet2.txt", "a"))
+            print("--test: " + str(test[0]['instances']), file=open("testDet2.txt", "a"))
+            return test
         else:
             return results
 
