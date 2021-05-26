@@ -141,6 +141,7 @@ def fast_rcnn_inference_single_image(
     """
     print("detectron2.modeling.roi_head.fast_rcnn.fast_rcnn_inference_single_image", file=open("testDet2.txt", "a"))
     print("--boxes (type): " + str(type(boxes)), file=open("testDet2.txt", "a"))
+    # torch.isfinite()用來檢查數值是不是有限的，若是無限大、負無限大或NaN表示False。
     valid_mask = torch.isfinite(boxes).all(dim=1) & torch.isfinite(scores).all(dim=1)
     print("--valid_mask: ", file=open("testDet2.txt", "a"))
     print(valid_mask, file=open("testDet2.txt", "a"))
@@ -177,7 +178,7 @@ def fast_rcnn_inference_single_image(
         boxes = boxes[filter_mask]
     scores = scores[filter_mask]
     print("--scores (after num_bbox_reg_classes): ", file=open("testDet2.txt", "a"))
-    print(scores, file=open("testDet2.txt", "a"))
+    print(scores[0], file=open("testDet2.txt", "a"))
     print("--boxes (after num_bbox_reg_classes): ", file=open("testDet2.txt", "a"))
     print(boxes, file=open("testDet2.txt", "a"))
     #scores[0] = 0.9999
@@ -542,22 +543,22 @@ class FastRCNNOutputLayers(nn.Module):
         print("--proposals: " + str(proposals), file=open("testDet2.txt", "a"))
         print("--last_prediction: " + str(last_prediction), file=open("testDet2.txt", "a"))
         print("--features_for_pred_masks: " + str(features_for_pred_masks), file=open("testDet2.txt", "a"))
+        print("--scores: " + str(scores), file=open("testDet2.txt", "a"))
         
         if len(last_prediction) > 0:
-            last_pred = detector_postprocess(last_prediction, 480, 640)
+            #last_pred = detector_postprocess(last_prediction, 480, 640)
             print("--last_prediction: " + str(last_prediction), file=open("testDet2.txt", "a"))
-            cur_pred = [my_build_prediction(
+            print("--boxes (before my build): " + str(boxes), file=open("mask_output.txt", "a"))
+            cur_pred, test_box, filter_inds = my_build_prediction(
                 boxes,
                 scores,
                 image_shapes,
                 self.test_score_thresh,
-            )]
-            print("--cur_pred: " + str(cur_pred), file=open("testDet2.txt", "a"))
+            )
             cur_pred = get_pred_masks(features_for_pred_masks, cur_pred)
-            print("--cur_pred (after get_pred_masks): " + str(cur_pred), file=open("testDet2.txt", "a"))
             cur_pred = detector_postprocess(cur_pred[0], 480, 640)
-            print("--cur_pred (after detector_postprocess): " + str(cur_pred), file=open("testDet2.txt", "a"))
-            test_scores = adjust_scores(last_pred, cur_pred, scores)
+            test_scores = adjust_scores(last_prediction, cur_pred, filter_inds, test_box, self.test_nms_thresh)
+            print("--boxes (after my build): " + str(boxes), file=open("mask_output.txt", "a"))
         
         return fast_rcnn_inference(
             boxes,
@@ -684,29 +685,40 @@ def my_build_prediction(
         result.scores = scores
         result.pred_classes = filter_inds[:, 1]
         
-    return result
+    return [result], boxes, filter_inds
     
-def adjust_scores(last_prediction, cur_prediction, scores):
+def adjust_scores(last_prediction, cur_prediction, filter_inds, original_boxes, nms_thresh):
+    newScores = []
+
     print("detectron2.modeling.roi_heads.fast_rcnn.adjust_scores", file=open("testDet2.txt", "a"))
     # 取得Instance class裡fields的資料，再取出fields裡pred_masks的資料
     last_pred_masks = last_prediction.get_fields()
     cur_pred_masks = cur_prediction.get_fields()
-    print("--last (class): " + str(last_pred_masks['pred_classes'][0]), file=open("mask_output.txt", "w"))
-    print("--cur (class): " + str(cur_pred_masks['pred_classes'][2]), file=open("mask_output.txt", "a"))
-    print("--last (bbox): " + str(last_pred_masks['pred_boxes'][0]), file=open("mask_output.txt", "a"))
-    print("--cur (bbox): " + str(cur_pred_masks['pred_boxes'][2]), file=open("mask_output.txt", "a"))
-    last_pred_masks = last_pred_masks['pred_masks']
-    cur_pred_masks = cur_pred_masks['pred_masks']
+    print("--last (class): " + str(last_pred_masks['pred_classes'][0]), file=open("mask_output.txt", "a"))
+    print("--cur_prediction(box): " + str(cur_pred_masks['pred_boxes']), file=open("mask_output.txt", "a"))
+    #print("--cur (class): " + str(cur_pred_masks['pred_classes'][9]), file=open("mask_output.txt", "a"))
+    #print("--last (bbox): " + str(last_pred_masks['pred_boxes'][0]), file=open("mask_output.txt", "a"))
+    #print("--cur (bbox): " + str(cur_pred_masks['pred_boxes'][9]), file=open("mask_output.txt", "a"))
+    
+    #for cur_pred_class, cur_pred_mask in zip(cur_pred_masks['pred_classes'], cur_pred_masks['pred_masks']):
+    for i in range(len(cur_prediction)):
+        for last_pred_class, last_pred_mask in zip(last_pred_masks['pred_classes'], last_pred_masks['pred_masks']):
+            if cur_pred_masks['pred_classes'][i] == last_pred_class:
+                test = torch.logical_and(last_pred_mask, cur_pred_masks['pred_masks'][i])
+                areaIntsection = torch.count_nonzero(test)
+                area1 = torch.count_nonzero(last_pred_mask)
+                area2 = torch.count_nonzero(cur_pred_masks['pred_masks'][i])
+                areaIoU = areaIntsection / (area1 + area2 - areaIntsection)
+                #print("--IoU: " + str(areaIoU), file=open("mask_output.txt", "a"))
+                newScores.append(areaIoU)
+                
+    #newScores = torch.tensor(newScores)
+    print("--newScores: " + str(newScores), file=open("mask_output.txt", "a"))
+    #keep = batched_nms(original_boxes, newScores, filter_inds[:, 1], nms_thresh)
+    #print("--keep: " + str(keep), file=open("mask_output.txt", "a"))
+    
     # test
-    #test = torch.logical_and(last_pred_masks[0], now_pred_masks[9])
-    #test2 = torch.logical_and(last_pred_masks[0], now_pred_masks[1])
-    #torch.set_printoptions(profile="full")
-    print("--last_pred_masks.nonzero: " + str(torch.nonzero(last_pred_masks[0])), file=open("mask_output.txt", "a"))
-    print("--cur_pred_masks.nonzero: " + str(torch.nonzero(cur_pred_masks[2])), file=open("mask_output.txt", "a"))
-    #print("--test: " + str(test), file=open("mask_output.txt", "a"))
-    #torch.set_printoptions(profile="default") # reset
-    #print("--test torch.count_nonzero: " + str(torch.count_nonzero(test)), file=open("testDet2.txt", "a"))
-    #print("--test2 torch.count_nonzero: " + str(torch.count_nonzero(test2)), file=open("testDet2.txt", "a"))
+    #test = torch.logical_and(last_pred_masks[0], cur_pred_masks[9])
     
     
     

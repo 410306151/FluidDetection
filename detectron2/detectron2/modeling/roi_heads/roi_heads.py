@@ -572,7 +572,7 @@ class StandardROIHeads(ROIHeads):
         self.box_pooler = box_pooler
         self.box_head = box_head
         self.box_predictor = box_predictor
-        self.last_prediction = []
+        #self.last_prediction = []
 
         self.mask_on = mask_in_features is not None
         if self.mask_on:
@@ -740,14 +740,14 @@ class StandardROIHeads(ROIHeads):
             return proposals, losses
         else:
             print("detectron2.modeling.roi_heads.roi_heads.forward", file=open("testDet2.txt", "a"))
-            pred_instances = self._forward_box(features, proposals, self.last_prediction, features)
+            pred_instances = self._forward_box(features, proposals, last_prediction, features)
             print("--pred_instances (first): " + str(pred_instances), file=open("testDet2.txt", "a"))
             # During inference cascaded prediction is used: the mask and keypoints heads are only
             # applied to the top scoring box detections.
             pred_instances = self.forward_with_given_boxes(features, pred_instances)
-            self.last_prediction = pred_instances[0]
+            #self.last_prediction = pred_instances[0]
             
-            print("--self.last_prediction: " + str(self.last_prediction), file=open("testDet2.txt", "a"))
+            print("--last_prediction: " + str(last_prediction), file=open("testDet2.txt", "a"))
             print("--pred_instances (second): " + str(pred_instances), file=open("testDet2.txt", "a"))
             print("--pred_instances (shape): ", file=open("testDet2.txt", "a"))
             print(len(pred_instances[0].pred_masks), file=open("testDet2.txt", "a"))
