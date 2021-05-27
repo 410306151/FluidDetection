@@ -178,7 +178,7 @@ def fast_rcnn_inference_single_image(
         boxes = boxes[filter_mask]
     scores = scores[filter_mask]
     print("--scores (after num_bbox_reg_classes): ", file=open("testDet2.txt", "a"))
-    print(scores[0], file=open("testDet2.txt", "a"))
+    print(scores, file=open("testDet2.txt", "a"))
     print("--boxes (after num_bbox_reg_classes): ", file=open("testDet2.txt", "a"))
     print(boxes, file=open("testDet2.txt", "a"))
     #scores[0] = 0.9999
@@ -557,17 +557,16 @@ class FastRCNNOutputLayers(nn.Module):
             )
             cur_pred = get_pred_masks(features_for_pred_masks, cur_pred)
             cur_pred = detector_postprocess(cur_pred[0], 480, 640)
-            test_scores = adjust_scores(last_prediction, cur_pred, filter_inds, test_box, self.test_nms_thresh)
-            print("--boxes (after my build): " + str(boxes), file=open("mask_output.txt", "a"))
-        
-        return fast_rcnn_inference(
-            boxes,
-            scores,
-            image_shapes,
-            self.test_score_thresh,
-            self.test_nms_thresh,
-            self.test_topk_per_image,
-        )
+            return adjust_scores(last_prediction, cur_pred, filter_inds, test_box, image_shapes, self.test_nms_thresh, self.test_topk_per_image)
+        else:
+            return fast_rcnn_inference(
+                boxes,
+                scores,
+                image_shapes,
+                self.test_score_thresh,
+                self.test_nms_thresh,
+                self.test_topk_per_image,
+            )
 
     def predict_boxes_for_gt_classes(self, predictions, proposals):
         """
@@ -687,15 +686,14 @@ def my_build_prediction(
         
     return [result], boxes, filter_inds
     
-def adjust_scores(last_prediction, cur_prediction, filter_inds, original_boxes, nms_thresh):
-    newScores = []
-
+def adjust_scores(last_prediction, cur_prediction, filter_inds, original_boxes, image_shapes: List[Tuple[int, int]], nms_thresh, topk_per_image):
     print("detectron2.modeling.roi_heads.fast_rcnn.adjust_scores", file=open("testDet2.txt", "a"))
     # 取得Instance class裡fields的資料，再取出fields裡pred_masks的資料
     last_pred_masks = last_prediction.get_fields()
     cur_pred_masks = cur_prediction.get_fields()
     print("--last (class): " + str(last_pred_masks['pred_classes'][0]), file=open("mask_output.txt", "a"))
-    print("--cur_prediction(box): " + str(cur_pred_masks['pred_boxes']), file=open("mask_output.txt", "a"))
+    print("--cur_pred_masks(box): " + str(cur_pred_masks['pred_boxes']), file=open("mask_output.txt", "a"))
+    #print("--cur_pred_masks['scores'] before: " + str(cur_pred_masks['scores']), file=open("mask_output.txt", "a"))
     #print("--cur (class): " + str(cur_pred_masks['pred_classes'][9]), file=open("mask_output.txt", "a"))
     #print("--last (bbox): " + str(last_pred_masks['pred_boxes'][0]), file=open("mask_output.txt", "a"))
     #print("--cur (bbox): " + str(cur_pred_masks['pred_boxes'][9]), file=open("mask_output.txt", "a"))
@@ -710,16 +708,23 @@ def adjust_scores(last_prediction, cur_prediction, filter_inds, original_boxes, 
                 area2 = torch.count_nonzero(cur_pred_masks['pred_masks'][i])
                 areaIoU = areaIntsection / (area1 + area2 - areaIntsection)
                 #print("--IoU: " + str(areaIoU), file=open("mask_output.txt", "a"))
-                newScores.append(areaIoU)
+                cur_pred_masks['scores'][i] = areaIoU
                 
     #newScores = torch.tensor(newScores)
-    print("--newScores: " + str(newScores), file=open("mask_output.txt", "a"))
-    #keep = batched_nms(original_boxes, newScores, filter_inds[:, 1], nms_thresh)
-    #print("--keep: " + str(keep), file=open("mask_output.txt", "a"))
+    #print("--cur_pred_masks['scores'] after: " + str(cur_pred_masks['scores']), file=open("mask_output.txt", "a"))
+    keep = batched_nms(original_boxes, cur_pred_masks['scores'], filter_inds[:, 1], nms_thresh)
+    print("--keep: " + str(keep), file=open("mask_output.txt", "a"))
     
+    if topk_per_image >= 0:
+        keep = keep[:topk_per_image]
+    boxes, scores, filter_inds = original_boxes[keep], cur_pred_masks['scores'][keep], filter_inds[keep]
+    result = Instances(image_shapes[0])
+    result.pred_boxes = Boxes(boxes)
+    result.scores = scores
+    result.pred_classes = filter_inds[:, 1]
     # test
-    #test = torch.logical_and(last_pred_masks[0], cur_pred_masks[9])
+    print("--result: " + str(result), file=open("mask_output.txt", "a"))
+    print("--boxes: " + str(boxes), file=open("mask_output.txt", "a"))
+    print("--original_boxes: " + str(original_boxes), file=open("mask_output.txt", "a"))
     
-    
-    
-    return 0
+    return [result], filter_inds[:, 0]
