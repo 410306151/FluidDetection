@@ -9,7 +9,7 @@ from torch.nn import functional as F
 from detectron2.config import configurable
 from detectron2.layers import Linear, ShapeSpec, batched_nms, cat, cross_entropy, nonzero_tuple
 from detectron2.modeling.box_regression import Box2BoxTransform
-from detectron2.structures import Boxes, Instances
+from detectron2.structures import Boxes, Instances, pairwise_iou
 from detectron2.utils.events import get_event_storage
 from detectron2.modeling.postprocessing import detector_postprocess
 
@@ -651,6 +651,15 @@ class FastRCNNOutputLayers(nn.Module):
         num_inst_per_image = [len(p) for p in proposals]
         probs = F.softmax(scores, dim=-1)
         return probs.split(num_inst_per_image, dim=0)
+        
+def bbox_compare(last_box, cur_box):
+    # Tensor要先reshape才能轉成Boxes，然後才能用detectron2內建Boxes的IoU method
+    boxes = Boxes(last_box.reshape(-1, 4))
+    box_iou = pairwise_iou(boxes, cur_box)
+    print("--box_iou: " + str(box_iou), file=open("mask_output.txt", "a"))
+    if box_iou > 0.6:
+        return True
+    return False
 
 def my_build_prediction(
     boxes: List[torch.Tensor],
@@ -702,8 +711,10 @@ def my_build_prediction(
         last_pred_masks = last_prediction.get_fields()
         cur_pred_masks = cur_pred.get_fields()
         for i in range(len(cur_pred)):
-            for last_pred_class, last_pred_mask in zip(last_pred_masks['pred_classes'], last_pred_masks['pred_masks']):
-                if cur_pred_masks['pred_classes'][i] == last_pred_class:
+            for last_pred_class, last_pred_mask, last_pred_box in zip(last_pred_masks['pred_classes'], last_pred_masks['pred_masks'], last_pred_masks['pred_boxes']):
+                if cur_pred_masks['pred_classes'][i] == last_pred_class and bbox_compare(last_pred_box, cur_pred_masks['pred_boxes'][i]):
+                    print("--last_pred_class: " + str(last_pred_class), file=open("mask_output.txt", "a"))
+                    print("--cur_pred_masks['pred_classes'][i]: " + str(cur_pred_masks['pred_classes'][i]), file=open("mask_output.txt", "a"))
                     test = torch.logical_and(last_pred_mask, cur_pred_masks['pred_masks'][i])
                     areaIntsection = torch.count_nonzero(test)
                     area1 = torch.count_nonzero(last_pred_mask)
