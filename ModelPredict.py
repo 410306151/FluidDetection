@@ -20,9 +20,9 @@ import PIL
 import io
 import codecs
 
-targetJSON = "positive_5.json" # "positive_5_non-labeled.json"
-targetFolder = "positive_5"
-subFolder = "" # "/Non-labeled"
+targetJSON = "Test_negative_high-1_non-labeled.json"
+targetFolder = "Validate/Test_negative_0612_A"
+subFolder = "/negative_high-1"
 
 # 註冊資料集到detectron2
 register_coco_instances("image_test", {}, "./" + targetFolder + "/" + targetJSON, "./" + targetFolder + subFolder)
@@ -115,16 +115,18 @@ def validateModel(testData, datasetDict, metadata, directory):
     cfg.merge_from_file(
         "/home/ad/detectron2/detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
     )
-    cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.75   # set the testing threshold for this model
-    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST  = 0.1 # 設定Non-Maximum Suppression的IoU門檻
-    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 3  # 3 classes (積水, 腎臟, 肝臟)
+    #cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final-2021-09-30-NewTraining.pth")
+    cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final-2021-11-19-AllAndMy800.pth")
+    #cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final-2021-11-18-TrainMyDraw.pth")
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.4   # set the testing threshold for this model
+    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST  = 1.1 # 設定Non-Maximum Suppression的IoU門檻
+    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2  # 2 classes (腎臟, 肝臟)
     cfg.DATASETS.TEST = (testData, )
     predictor = DefaultPredictor(cfg)
     if not os.path.exists(directory):
         os.makedirs(directory)
-    for i in range(len(datasetDict)):
-    # for i in range(29, 30):
+    #for i in range(len(datasetDict)):
+    for i in range(93, 94):
         d = datasetDict[i]
         filename = d["file_name"].split('/')[-1]
         im = cv2.imread(d["file_name"])
@@ -132,7 +134,7 @@ def validateModel(testData, datasetDict, metadata, directory):
         outputs = predictor(im)
         v = Visualizer(im[:, :, ::-1],
                        metadata=metadata,
-                       scale=0.5,
+                       scale=1,
                        instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels
                        )
         result = v.draw_instance_predictions(outputs["instances"].to("cpu"))

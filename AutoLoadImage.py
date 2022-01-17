@@ -6,18 +6,13 @@ def get_categories():
     # 目前種類只有固定3種，所以寫死
     categories = []
     category = {}
-    category["supercategory"] = "fluid"
-    category["id"] = 0
-    category["name"] = "fluid"
-    categories.append(category)
-    category = {}
     category["supercategory"] = "kidney"
-    category["id"] = 1
+    category["id"] = 0
     category["name"] = "kidney"
     categories.append(category)
     category = {}
     category["supercategory"] = "liver"
-    category["id"] = 2
+    category["id"] = 1
     category["name"] = "liver"
     categories.append(category)
 
@@ -44,14 +39,11 @@ def read_directory(directoryName, outputFile):
     json.dump(data_coco, open(outputFile, "w"), indent=4)
 
 
-# read_directory("negative_6/", "negative_6/negative_6.json")
-read_directory("tempData/negative_4/Non-labeled", "tempData/negative_4/negative_4_non-labeled.json")
-read_directory("tempData/negative_6/Non-labeled", "tempData/negative_6/negative_6_non-labeled.json")
-read_directory("tempData/negative_high/Non-labeled", "tempData/negative_high/negative_high_non-labeled.json")
-read_directory("tempData/negative_low/Non-labeled", "tempData/negative_low/negative_low_non-labeled.json")
-read_directory("tempData/positive_3/Non-labeled", "tempData/positive_3/positive_3_non-labeled.json")
-read_directory("tempData/positive_5/Non-labeled", "tempData/positive_5/positive_5_non-labeled.json")
-read_directory("tempData/positive_high/Non-labeled", "tempData/positive_high/positive_high_non-labeled.json")
-read_directory("tempData/positive_high_2/Non-labeled", "tempData/positive_high_2/positive_high_2_non-labeled.json")
-read_directory("tempData/positive_low/Non-labeled", "tempData/positive_low/positive_low_non-labeled.json")
-read_directory("tempData/positive_low_2/Non-labeled", "tempData/positive_low_2/positive_low_2_non-labeled.json")
+read_directory("negative_high/Non-labeled", "negative_high/negative_high_non-labeled.json")
+#read_directory("positive_3/Non-labeled", "positive_3/positive_3_non-labeled.json")
+#read_directory("Validation/Test_negative_0522_C/negative_2-2", "Validation/Test_negative_0522_C/Test_negative_0522_C-negative_2-2_non-labeled.json")
+#read_directory("Validation/Test_negative_0612_B/negative_high-1-Part2", "Validation/Test_negative_0612_B/Test_negative_0612_B-negative_high-1-Part2_non-labeled.json")
+#read_directory("Validation/Test_negative_0612_B/negative_high-2", "Validation/Test_negative_0612_B/Test_negative_0612_B-negative_high-2_non-labeled.json")
+
+
+
